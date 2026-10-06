@@ -5,13 +5,13 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Created by dfeodot on 10/10/2017.
  */
 @Controller
-public class WebController extends WebMvcConfigurerAdapter{
+public class WebController implements WebMvcConfigurer{
 
     @Value("${service.location}")
     private String serviceLocation;
