@@ -3,9 +3,10 @@ package noname.fm.controller;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import noname.fm.utils.MusicCollection;
 import noname.fm.utils.TrackInfo;
@@ -45,7 +46,7 @@ public class TrackInfoController {
         int index = 0;
         //TODO: this will loop forever and ever at some point
 //        do{
-            index = (int) (Math.random() * length);
+            index = (int) (ThreadLocalRandom.current().nextDouble() * length);
 //        }
 //        while(returnedTracks[index] != 0);
 //        returnedTracks[index] = 1;

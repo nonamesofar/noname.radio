@@ -3,15 +3,14 @@ package noname.fm.utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.MimeTypeUtils;
-import org.springframework.util.StringUtils;
+import org.springframework.util.ObjectUtils;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -48,7 +47,7 @@ public class MultipartFileSender {
     }
 
     public static MultipartFileSender fromURIString(String uri) {
-        return new MultipartFileSender().setFilepath(Paths.get(uri));
+        return new MultipartFileSender().setFilepath(Path.of(uri));
     }
 
     //** internal setter **//
@@ -82,7 +81,7 @@ public class MultipartFileSender {
         String fileName = filepath.getFileName().toString();
         FileTime lastModifiedObj = Files.getLastModifiedTime(filepath);
 
-        if (StringUtils.isEmpty(fileName) || lastModifiedObj == null) {
+        if (ObjectUtils.isEmpty(fileName) || lastModifiedObj == null) {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return;
         }
@@ -215,7 +214,7 @@ public class MultipartFileSender {
         try (InputStream input = new BufferedInputStream(Files.newInputStream(filepath));
              OutputStream output = response.getOutputStream()) {
 
-            if (ranges.isEmpty() || ranges.get(0) == full) {
+            if (ranges.isEmpty() || ranges.getFirst() == full) {
 
                 // Return full file.
                 logger.info("Return full file");
@@ -227,7 +226,7 @@ public class MultipartFileSender {
             } else if (ranges.size() == 1) {
 
                 // Return single part of file.
-                Range r = ranges.get(0);
+                Range r = ranges.getFirst();
                 logger.info("Return 1 part of file : from ({}) to ({})", r.start, r.end);
                 response.setContentType(contentType);
                 response.setHeader("Content-Range", "bytes " + r.start + "-" + r.end + "/" + r.total);
