@@ -11,25 +11,20 @@ import jakarta.servlet.http.HttpServletResponse;
 import noname.fm.utils.MusicCollection;
 import noname.fm.utils.TrackInfo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Created by dfeodot on 10/11/2017.
  */
 @Controller
 public class TrackInfoController {
-
-    @Value("${play.service}")
-    private String playService;
-
-    @Value("${img.service}")
-    private String imgService;
 
     @Autowired
     MusicCollection mCollection;
@@ -57,11 +52,14 @@ public class TrackInfoController {
     @ResponseBody
     public TrackInfoUI getTrackInfo(@RequestParam(value="id") int id){
 
+        if (id < 0 || id >= mCollection.getCollection().size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         TrackInfo track = mCollection.getTrackInfo( id );
-        String cover = imgService+"?id="+id;
-
-        String playLink = playService+"?id="+id;
-        return new TrackInfoUI(track.getAlbum(), track.getArtist(), playLink, cover, track.getTitle());
+        String cover = "/cover?id="+id;
+        String playLink = "/listen?id="+id;
+        String waveform = "/waveform?id="+id;
+        return new TrackInfoUI(track.getAlbum(), track.getArtist(), playLink, cover, waveform, track.getTitle());
     }
 
     private class TrackInfoUI {
@@ -71,13 +69,15 @@ public class TrackInfoController {
         //this should be the link to call to play a track
         private String audioTrack;
         private String picture;
+        private String waveform;
         private String title;
 
-        public TrackInfoUI(String album, String artist, String audioTrack, String cover, String title) {
+        public TrackInfoUI(String album, String artist, String audioTrack, String cover, String waveform, String title) {
             this.album = album;
             this.artist = artist;
             this.audioTrack = audioTrack;
             this.picture = cover;
+            this.waveform = waveform;
             this.title = title;
         }
 
@@ -95,6 +95,10 @@ public class TrackInfoController {
 
         public String getPicture() {
             return picture;
+        }
+
+        public String getWaveform() {
+            return waveform;
         }
 
         public String getTitle() {

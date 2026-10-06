@@ -1,6 +1,5 @@
 package noname.fm.controller;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,9 +11,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  */
 @Controller
 public class WebController implements WebMvcConfigurer{
-
-    @Value("${service.location}")
-    private String serviceLocation;
 
     @GetMapping("/")
     public String login() {
@@ -29,11 +25,6 @@ public class WebController implements WebMvcConfigurer{
     @GetMapping("/player")
     public String play(){
         return "playerV2";
-    }
-
-    @GetMapping("/servicelocation")
-    public String getServiceLocation(){
-        return serviceLocation;
     }
 
 }

@@ -62,7 +62,7 @@
   }
 
   function getNextTrack(){
-    var service="http://localhost:8080/nextTrack";
+    var service="/nextTrack";
     var index;
     jQuery.ajax({
         url: service,
@@ -75,7 +75,7 @@
   }
 
   function loadTrack(index){
-    var service = "http://localhost:8080/trackInfo?id="+index;
+    var service = "/trackInfo?id="+index;
     var song;
     //async until I figure out how I can properyl do this :(
     jQuery.ajax({
@@ -85,6 +85,10 @@
         },
         async:false
     });
+    if (!song) {
+        // /trackInfo failed (e.g. unknown id): nothing to add
+        return;
+    }
     //now we add stuff to the playlist
     var newtrack = addTrackToPlaylist(song);
     players[0].dom.playlist.innerHTML += newtrack;
@@ -92,11 +96,18 @@
     artwork.push(song.picture);
   }
 
+    function escapeHtml(text){
+        // tags come straight from ID3 data, so never inject them as markup
+        return String(text === null || text === undefined ? "" : text)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
     function addTrackToPlaylist(song){
         //<li><a href="http://freshly-ground.com/data/audio/sm2/SonReal%20-%20Let%20Me%20%28Prod%202oolman%29.mp3"><b>SonReal</b> - Let Me <span class="label">Explicit</span></a></li>
-        var html = "<li><a href=" + song.audioTrack + ">";
-        html += "<b>" + song.artist +"</b>";
-        html += " - " + song.title;
+        var html = "<li><a href=\"" + escapeHtml(song.audioTrack) + "\" data-waveform=\"" + escapeHtml(song.waveform) + "\">";
+        html += "<b>" + escapeHtml(song.artist) +"</b>";
+        html += " - " + escapeHtml(song.title);
         html += "</a></li>";
         return html;
     }
@@ -140,6 +151,15 @@
       }
     }
 
+        // start a song right away (browsers may block autoplay until the first user gesture)
+        if (players.length) {
+          try {
+            players[0].actions.play();
+          } catch (err) {
+            console.warn('autoplay failed', err);
+          }
+        }
+
         setTimeout( function(){
             $('.container').addClass('loaded');
         }, 600);
@@ -151,7 +171,7 @@
 
   Player = function(playerNode) {
 
-    var css, dom, extras, playlistController, soundObject, actions, actionData, defaultItem, defaultVolume, firstOpen, exports;
+    var css, dom, extras, playlistController, soundObject, actions, actionData, defaultItem, defaultVolume, firstOpen, exports, waveformState;
 
     css = {
       disabled: 'disabled',
@@ -172,8 +192,16 @@
       progress: null,
       progressTrack: null,
       progressBar: null,
+      waveform: null,
       duration: null,
       volume: null
+    };
+
+    // overview waveform of the current track: url it came from, 0-255 bins, and playback fraction (0-1)
+    waveformState = {
+      url: null,
+      bins: null,
+      fraction: 0
     };
 
     // prepended to tracks when a sound fails to load/play
@@ -234,6 +262,98 @@
         dom.playlistTarget.innerHTML = '<ul class="sm2-playlist-bd"><li><marquee>' + item.innerHTML + '</marquee></li></ul>';
       }
 
+      loadWaveform(item);
+
+    }
+
+    function loadWaveform(item) {
+
+      // item is the playlist <a>; its data-waveform attribute holds the waveform URL.
+      var url = item.getAttribute('data-waveform');
+
+      waveformState.url = url;
+      waveformState.bins = null;
+      waveformState.fraction = 0;
+
+      utils.css.remove(dom.o, 'has-waveform');
+      drawWaveform();
+
+      if (!url) {
+        return;
+      }
+
+      // async: the first request for a track can take a few seconds while the server decodes it.
+      jQuery.ajax({
+        url: url,
+        dataType: 'json',
+        success: function(data) {
+          // ignore late responses for a track that is no longer selected
+          if (waveformState.url !== url) {
+            return;
+          }
+          if (data && data.bins && data.bins.length > 0) {
+            waveformState.bins = data.bins;
+            utils.css.add(dom.o, 'has-waveform');
+            drawWaveform();
+          }
+        }
+        // on error: do nothing, the plain progress bar stays
+      });
+
+    }
+
+    function drawWaveform() {
+
+      var canvas = dom.waveform,
+          bins = waveformState.bins,
+          ratio, cssWidth, cssHeight, ctx, n, barCount, playedX, k, start, end, j, max, barHeight, barWidth, x;
+
+      if (!canvas) {
+        return;
+      }
+
+      ratio = window.devicePixelRatio || 1;
+      cssWidth = canvas.clientWidth;
+      cssHeight = canvas.clientHeight;
+
+      // size the backing store only when needed (resizing clears the canvas)
+      if (canvas.width !== Math.round(cssWidth * ratio) || canvas.height !== Math.round(cssHeight * ratio)) {
+        canvas.width = Math.round(cssWidth * ratio);
+        canvas.height = Math.round(cssHeight * ratio);
+      }
+
+      ctx = canvas.getContext('2d');
+      // draw in device pixels so bar edges stay sharp at fractional ratios (1.25, 1.5, ...)
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!bins) {
+        return;
+      }
+
+      n = bins.length;
+      barCount = Math.floor(cssWidth / 3);
+      playedX = waveformState.fraction * cssWidth;
+      barWidth = Math.max(1, Math.round(2 * ratio));
+
+      for (k = 0; k < barCount; k++) {
+
+        start = Math.floor(k * n / barCount);
+        end = Math.max(start + 1, Math.floor((k + 1) * n / barCount));
+        max = 0;
+
+        for (j = start; j < end && j < n; j++) {
+          max = Math.max(max, bins[j]);
+        }
+
+        barHeight = Math.max(1, Math.round(max / 255 * canvas.height * 0.9));
+        x = k * 3;
+
+        ctx.fillStyle = x < playedX ? '#ffffff' : '#7d8286';
+        ctx.fillRect(Math.round(x * ratio), Math.round((canvas.height - barHeight) / 2), barWidth, barHeight);
+
+      }
+
     }
 
     function makeSound(url) {
@@ -252,6 +372,9 @@
 
           left = Math.min(progressMaxLeft, Math.max(0, (progressMaxLeft * (this.position / this.durationEstimate)))) + '%';
           width = Math.min(100, Math.max(0, (100 * (this.position / this.durationEstimate)))) + '%';
+
+          waveformState.fraction = Math.min(1, Math.max(0, this.position / this.durationEstimate)) || 0;
+          drawWaveform();
 
           if (this.duration) {
 
@@ -968,6 +1091,8 @@
 
       dom.progressBar = utils.dom.get(dom.o, '.sm2-progress-bar');
 
+      dom.waveform = utils.dom.get(dom.o, '.sm2-waveform');
+
       dom.volume = utils.dom.get(dom.o, 'a.sm2-volume-control');
 
       // measure volume control dimensions
@@ -994,6 +1119,7 @@
       utils.events.add(dom.o, 'click', handleClick);
       utils.events.add(dom.progressTrack, 'mousedown', handleProgressMouseDown);
       utils.events.add(dom.progressTrack, 'touchstart', handleProgressMouseDown);
+      utils.events.add(window, 'resize', drawWaveform);
 
     }
 
