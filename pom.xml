@@ -48,6 +48,13 @@
             <version>2.0.3</version>
         </dependency>
 
+        <!--pure-Java MP3 decoder used to compute waveforms-->
+        <dependency>
+            <groupId>com.googlecode.soundlibs</groupId>
+            <artifactId>jlayer</artifactId>
+            <version>1.0.1.4</version>
+        </dependency>
+
         <!-- tag::tests[] -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

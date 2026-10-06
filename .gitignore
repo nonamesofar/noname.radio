@@ -1,0 +1,5 @@
+waveform-cache/
+app.log
+.app.pid
+target/
+config/
